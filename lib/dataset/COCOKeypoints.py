@@ -48,6 +48,7 @@ class CocoKeypoints(CocoDataset):
         self.base_sigma = cfg.DATASET.BASE_SIGMA
         self.base_size = cfg.DATASET.BASE_SIZE
         self.int_sigma = cfg.DATASET.INT_SIGMA
+        self.visible_joints_only = cfg.DATASET.VISIBLE_JOINTS_ONLY
 
         if remove_images_without_annotations:
             self.ids = [
@@ -72,6 +73,12 @@ class CocoKeypoints(CocoDataset):
 
         # TODO(bowen): to generate scale-aware sigma, modify `get_joints` to associate a sigma to each joint
         joints = self.get_joints(anno)
+
+        if self.visible_joints_only:
+            # Drop keypoints that are behind something else
+            joints[joints[:,:,2] != 2] = 0
+            has_keypoints = np.any(joints[:,:,2] != 0, axis=1)
+            joints = joints[has_keypoints]
 
         mask_list = [mask.copy() for _ in range(self.num_scales)]
         joints_list = [joints.copy() for _ in range(self.num_scales)]
