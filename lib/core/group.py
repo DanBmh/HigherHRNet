@@ -15,6 +15,16 @@ import numpy as np
 import torch
 
 
+# from . import grouper_tf as grouping
+# grouper = grouping.JointGrouper(
+#     num_joints=17,
+#     input_size=(512, 768),
+#     hmap_threshold=0.1,
+#     refine=True,
+#     adjust=True,
+# )
+
+
 def py_max_match(scores):
     m = Munkres()
     tmp = m.compute(scores)
@@ -279,5 +289,17 @@ class HeatmapParser(object):
                     )
                 ans[i] = self.refine(det_numpy, tag_numpy, ans[i])
             ans = [ans]
+
+        # # Uncomment to use grouper_tf instead
+        # tag2 = tag.cpu().numpy()
+        # det2 = det.cpu().numpy()
+        # det2 = np.transpose(det2, [0, 2, 3, 1])
+        # tag2 = np.transpose(tag2, [0, 2, 3, 1, 4])
+        # tag2 = np.squeeze(tag2, axis=-1)
+        # ans = grouper([tag2, det2])
+        # ans = ans.numpy()
+        # if np.sum(ans) == 0:
+        #     ans = np.array([[]])
+        # scores = [(i[:, 2]*(i[:, 4]==1)).mean() for i in ans[0]]
 
         return ans, scores
