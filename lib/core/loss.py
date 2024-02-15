@@ -33,6 +33,17 @@ class HeatmapLoss(nn.Module):
     def forward(self, pred, gt, mask):
         assert pred.size() == gt.size()
         loss = ((pred - gt)**2) * mask[:, None, :, :].expand_as(pred)
+
+        if gt.shape[1] > 17:
+            # Update mask for joints that it is only active if any person has a visible joint
+            # Since not all whole body joints are labeled the model would else be trained to 
+            # randomly predict those joints or suppress them (shape is (nbatch, njoint, h, w))
+            joint_visible = torch.any(torch.any(gt > 0, dim=-1) > 0, dim=-1)
+            joint_visible = joint_visible.unsqueeze(-1).unsqueeze(-1)
+            wb_mask = joint_visible.expand_as(gt)
+            wb_mask[:, 0:17] = 1  # Don't mask the default body joints
+            loss *= wb_mask.to(loss.dtype)
+
         loss = loss.mean(dim=3).mean(dim=2).mean(dim=1)
         # loss = loss.mean(dim=3).mean(dim=2).sum(dim=1)
         return loss

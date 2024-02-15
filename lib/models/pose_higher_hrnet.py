@@ -519,7 +519,7 @@ class PoseHigherResolutionNet(nn.Module):
 
         return final_outputs
 
-    def init_weights(self, pretrained='', verbose=True):
+    def init_weights(self, pretrained='', num_joints=17, verbose=True):
         logger.info('=> init weights from normal distribution')
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -553,6 +553,9 @@ class PoseHigherResolutionNet(nn.Module):
                 if name.split('.')[0] in self.pretrained_layers \
                    or self.pretrained_layers[0] is '*':
                     if name in parameters_names or name in buffers_names:
+                        if num_joints != 17:
+                            if 'final_layer' in name or 'deconv_layers.0.0.0' in name:
+                                continue
                         if verbose:
                             logger.info(
                                 '=> init {} from {}'.format(name, pretrained)
@@ -565,6 +568,6 @@ def get_pose_net(cfg, is_train, **kwargs):
     model = PoseHigherResolutionNet(cfg, **kwargs)
 
     if is_train and cfg.MODEL.INIT_WEIGHTS:
-        model.init_weights(cfg.MODEL.PRETRAINED, verbose=cfg.VERBOSE)
+        model.init_weights(cfg.MODEL.PRETRAINED, cfg.MODEL.NUM_JOINTS, verbose=cfg.VERBOSE)
 
     return model

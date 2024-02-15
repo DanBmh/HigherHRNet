@@ -19,6 +19,25 @@ FLIP_CONFIG = {
     'COCO_WITH_CENTER': [
         0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 17
     ],
+    'COCO_EXTRA_KEYPOINTS': [
+        0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 17, 18
+    ],
+    'COCO_WHOLE_BODY': [
+        0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15,  # body
+        20, 21, 22, 17, 18, 19,  # foot
+        39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23,  # face1
+        49, 48, 47, 46, 45, 44, 43, 42, 41, 40,  # face2
+        50, 51, 52, 53,  # face3
+        58, 57, 56, 55, 54,  # face4
+        68, 67, 66, 65, 62, 61, 60, 59,  # face5
+        70, 69, 64, 63,  # face6
+        77, 76, 75, 74, 73, 72, 71,  # face7
+        82, 81, 80, 79, 78, # face8
+        88, 87, 86, 85, 84, 83,  # face9
+        90, 89, # face10
+        112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132,  # hand1
+        91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111  # hand2
+    ],
     'CROWDPOSE': [
         1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 12, 13
     ],
@@ -61,6 +80,10 @@ def build_transforms(cfg, is_train=True):
         raise ValueError('Please implement flip_index for new dataset: %s.' % cfg.DATASET.DATASET)
     if cfg.DATASET.WITH_CENTER:
         coco_flip_index = FLIP_CONFIG[dataset_name + '_WITH_CENTER']
+    elif cfg.DATASET.ADD_EXTRA_JOINTS:
+        coco_flip_index = FLIP_CONFIG[dataset_name + '_EXTRA_KEYPOINTS']
+    elif cfg.DATASET.USE_WHOLE_BODY:
+        coco_flip_index = FLIP_CONFIG[dataset_name + '_WHOLE_BODY']
     else:
         coco_flip_index = FLIP_CONFIG[dataset_name]
 

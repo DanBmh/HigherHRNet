@@ -39,14 +39,14 @@ class CocoDataset(Dataset):
             target and transforms it.
     """
 
-    def __init__(self, root, dataset, data_format, transform=None,
+    def __init__(self, root, dataset, data_format, cfg, transform=None,
                  target_transform=None):
         from pycocotools.coco import COCO
         self.name = 'COCO'
         self.root = root
         self.dataset = dataset
         self.data_format = data_format
-        self.coco = COCO(self._get_anno_file_name())
+        self.coco = COCO(self._get_anno_file_name(cfg))
         self.ids = list(self.coco.imgs.keys())
         self.transform = transform
         self.target_transform = target_transform
@@ -65,7 +65,7 @@ class CocoDataset(Dataset):
             ]
         )
 
-    def _get_anno_file_name(self):
+    def _get_anno_file_name(self, cfg):
         # example: root/annotations/person_keypoints_tran2017.json
         # image_info_test-dev2017.json
         if 'test' in self.dataset:
@@ -77,11 +77,15 @@ class CocoDataset(Dataset):
                 )
             )
         else:
+            if cfg.DATASET.USE_WHOLE_BODY:
+                basename = 'coco_wholebody_{}_v1.0.json'
+            else:
+                basename = 'person_keypoints_{}2017.json'
             return os.path.join(
                 self.root,
                 'annotations',
-                'person_keypoints_{}.json'.format(
-                    self.dataset
+                basename.format(
+                    self.dataset[:-4]
                 )
             )
 

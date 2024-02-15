@@ -31,12 +31,8 @@ class CocoKeypoints(CocoDataset):
                  transforms=None):
         super().__init__(cfg.DATASET.ROOT,
                          dataset_name,
-                         cfg.DATASET.DATA_FORMAT)
-
-        if cfg.DATASET.WITH_CENTER:
-            assert cfg.DATASET.NUM_JOINTS == 18, 'Number of joint with center for COCO is 18'
-        else:
-            assert cfg.DATASET.NUM_JOINTS == 17, 'Number of joint for COCO is 17'
+                         cfg.DATASET.DATA_FORMAT,
+                         cfg)
 
         self.num_scales = self._init_check(heatmap_generator, joints_generator)
 
@@ -49,6 +45,8 @@ class CocoKeypoints(CocoDataset):
         self.base_size = cfg.DATASET.BASE_SIZE
         self.int_sigma = cfg.DATASET.INT_SIGMA
         self.visible_joints_only = cfg.DATASET.VISIBLE_JOINTS_ONLY
+        self.add_extra_joints = cfg.DATASET.ADD_EXTRA_JOINTS
+        self.use_whole_body = cfg.DATASET.USE_WHOLE_BODY
 
         if remove_images_without_annotations:
             self.ids = [
@@ -74,12 +72,6 @@ class CocoKeypoints(CocoDataset):
         # TODO(bowen): to generate scale-aware sigma, modify `get_joints` to associate a sigma to each joint
         joints = self.get_joints(anno)
 
-        if self.visible_joints_only:
-            # Drop keypoints that are behind something else
-            joints[joints[:,:,2] != 2] = 0
-            has_keypoints = np.any(joints[:,:,2] != 0, axis=1)
-            joints = joints[has_keypoints]
-
         mask_list = [mask.copy() for _ in range(self.num_scales)]
         joints_list = [joints.copy() for _ in range(self.num_scales)]
         target_list = list()
@@ -101,15 +93,21 @@ class CocoKeypoints(CocoDataset):
 
     def get_joints(self, anno):
         num_people = len(anno)
+        num_joints = len(anno[0]['keypoints']) // 3
 
         if self.scale_aware_sigma:
-            joints = np.zeros((num_people, self.num_joints, 4))
+            joints = np.zeros((num_people, num_joints, 4))
         else:
-            joints = np.zeros((num_people, self.num_joints, 3))
+            joints = np.zeros((num_people, num_joints, 3))
+
+        if self.with_center:
+            joints = np.concatenate(
+                [joints, np.zeros((num_people, 1, joints.shape[2]))], axis=1
+            )
 
         for i, obj in enumerate(anno):
-            joints[i, :self.num_joints_without_center, :3] = \
-                np.array(obj['keypoints']).reshape([-1, 3])
+            kpts = np.array(obj['keypoints']).reshape([-1, 3])
+            joints[i, :len(kpts), :3] = kpts
             if self.with_center:
                 joints_sum = np.sum(joints[i, :-1, :2], axis=0)
                 num_vis_joints = len(np.nonzero(joints[i, :-1, 2])[0])
@@ -125,6 +123,55 @@ class CocoKeypoints(CocoDataset):
                     sigma = int(np.round(sigma + 0.5))
                 assert sigma > 0, sigma
                 joints[i, :, 3] = sigma
+
+        if self.visible_joints_only:
+            # Drop keypoints that are behind something else
+            joints[joints[:, :, 2] != 2] = 0
+
+        if self.add_extra_joints:
+            # Adds hip and shoulder center
+            hip_center = (joints[:, 11, :2] + joints[:, 12, :2]) / 2
+            shoulder_center = (joints[:, 5, :2] + joints[:, 6, :2]) / 2
+            hip_vis = np.minimum(joints[:, 11, 2], joints[:, 12, 2])
+            shoulder_vis = np.minimum(joints[:, 5, 2], joints[:, 6, 2])
+            hip_center = np.concatenate([hip_center, hip_vis[:, None]], axis=1)
+            shoulder_center = np.concatenate(
+                [shoulder_center, shoulder_vis[:, None]], axis=1
+            )
+            joints = np.concatenate(
+                [joints, hip_center[:, None, :], shoulder_center[:, None, :]], axis=1
+            )
+
+        if self.use_whole_body:
+            num_people = len(joints)
+            foot_kpts = np.zeros((num_people, 6, 3))
+            face_kpts = np.zeros((num_people, 68, 3))
+            lhand_kpts = np.zeros((num_people, 21, 3))
+            rhand_kpts = np.zeros((num_people, 21, 3))
+
+            for i, obj in enumerate(anno):
+                kpts = np.array(obj["foot_kpts"]).reshape([-1, 3])
+                foot_kpts[i, :, :3] = kpts
+                kpts = np.array(obj["face_kpts"]).reshape([-1, 3])
+                face_kpts[i, :, :3] = kpts
+                kpts = np.array(obj["lefthand_kpts"]).reshape([-1, 3])
+                lhand_kpts[i, :, :3] = kpts
+                kpts = np.array(obj["righthand_kpts"]).reshape([-1, 3])
+                rhand_kpts[i, :, :3] = kpts
+
+                if self.visible_joints_only:
+                    foot_kpts[i, foot_kpts[i, :, 2] != 2] = 0
+                    face_kpts[i, face_kpts[i, :, 2] < 0.1] = 0
+                    lhand_kpts[i, lhand_kpts[i, :, 2] < 0.1] = 0
+                    rhand_kpts[i, rhand_kpts[i, :, 2] < 0.1] = 0
+
+            joints = np.concatenate(
+                [joints, foot_kpts, face_kpts, lhand_kpts, rhand_kpts], axis=1
+            )
+
+        if self.visible_joints_only:
+            has_keypoints = np.any(joints[:, :, 2] > 0, axis=1)
+            joints = joints[has_keypoints]
 
         return joints
 
